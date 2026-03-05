@@ -1,0 +1,79 @@
+'use client';
+
+import { RecipeStep } from '../types';
+
+export function CookingSteps({
+  steps,
+  currentStep,
+}: {
+  steps: RecipeStep[];
+  currentStep: number;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+      <h2 className="text-lg font-semibold text-gray-900">Steps</h2>
+      <ol className="space-y-4">
+        {steps.map((step) => {
+          const isDone = step.step_number - 1 < currentStep;
+          const isActive = step.step_number - 1 === currentStep;
+
+          return (
+            <li
+              key={step.step_number}
+              className={`flex gap-4 rounded-xl p-4 transition-colors ${
+                isActive
+                  ? 'bg-blue-50 border border-blue-200'
+                  : isDone
+                  ? 'opacity-50'
+                  : 'bg-gray-50'
+              }`}
+            >
+              <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  isActive
+                    ? 'bg-blue-500 text-white'
+                    : isDone
+                    ? 'bg-green-400 text-white'
+                    : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {isDone ? '✓' : step.step_number}
+              </div>
+
+              <div className="flex-1 space-y-1">
+                <p
+                  className={`text-sm ${
+                    isActive ? 'font-medium text-gray-900' : 'text-gray-700'
+                  }`}
+                >
+                  {step.instruction}
+                </p>
+
+                <div className="flex flex-wrap gap-3">
+                  {step.duration_minutes && (
+                    <span className="text-xs text-gray-400">
+                      ⏱ {step.duration_minutes} min{step.timer_label ? ` · ${step.timer_label}` : ''}
+                    </span>
+                  )}
+                  {step.requires_attention && (
+                    <span className="text-xs font-medium text-amber-600">⚠ Needs attention</span>
+                  )}
+                </div>
+
+                {step.tips.length > 0 && (
+                  <ul className="mt-1 space-y-0.5">
+                    {step.tips.map((tip, i) => (
+                      <li key={i} className="text-xs text-blue-600">
+                        💡 {tip}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
