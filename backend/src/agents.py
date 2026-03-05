@@ -12,7 +12,7 @@ import os
 from textwrap import dedent
 
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.ag_ui import StateDeps
 from ag_ui.core import EventType, StateSnapshotEvent
 
@@ -56,7 +56,7 @@ def get_recipe_parser() -> Agent[None, Recipe]:
     global _recipe_parser
     if _recipe_parser is None:
         _recipe_parser = Agent(
-            model=GoogleModel(MODEL_NAME),
+            model=OpenAIModel(MODEL_NAME),
             system_prompt=PARSE_RECIPE_PROMPT,
             output_type=Recipe,
         )
@@ -116,7 +116,7 @@ def get_substitution_agent() -> Agent[None, SubstitutionResult]:
     global _substitution_agent
     if _substitution_agent is None:
         _substitution_agent = Agent(
-            model=GoogleModel(MODEL_NAME),
+            model=OpenAIModel(MODEL_NAME),
             system_prompt=SUBSTITUTION_PROMPT,
             output_type=SubstitutionResult,
         )
@@ -182,7 +182,7 @@ Find the best matching ingredient and provide substitution details.
 # Recipe Companion Agent (pydantic-ai with AG-UI)
 # =============================================================================
 recipe_agent = Agent(
-    model=GoogleModel(MODEL_NAME),
+    model=OpenAIModel(MODEL_NAME),
     deps_type=StateDeps[RecipeContext],
     name="recipe_agent",
 )
