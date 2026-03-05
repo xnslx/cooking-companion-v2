@@ -9,15 +9,19 @@ import { IngredientsList } from './components/IngredientsList';
 import { CookingSteps } from './components/CookingSteps';
 import { RecipeUpload } from './components/RecipeUpload';
 import { CookingProgressBar } from './components/CookingProgressBar';
+import { PageLoadAnimation } from './components/PageLoadAnimation';
 import { RecipeContext } from './types';
+import { useState } from 'react';
 
 export default function Home() {
   const { state, setState, running } = useCoAgent<RecipeContext>({
     name: 'recipe_agent',
   });
+  const [introComplete, setIntroComplete] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-zinc-50">
+      {!introComplete && <PageLoadAnimation onComplete={() => setIntroComplete(true)} />}
       <main className="flex-1 p-8 max-w-3xl mx-auto space-y-6">
         <AnimatePresence mode="wait">
           {state?.recipe ? (

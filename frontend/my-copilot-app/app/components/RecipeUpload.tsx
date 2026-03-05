@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { WokLoadingAnimation } from './WokLoadingAnimation';
 import { RecipeContext } from '../types';
 
 interface RecipeUploadProps {
@@ -76,10 +78,9 @@ export function RecipeUpload({ onUpload }: RecipeUploadProps) {
       />
 
       {loading ? (
-        <div className="flex flex-col items-center gap-2 text-gray-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-400 border-t-transparent" />
-          <span className="text-sm transition-all duration-500">{loadingLabels[labelIndex]}</span>
-        </div>
+        <AnimatePresence mode="wait">
+          <WokLoadingAnimation label={loadingLabels[labelIndex]} />
+        </AnimatePresence>
       ) : (
         <div className="flex flex-col items-center gap-2 text-gray-400">
           <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
