@@ -11,7 +11,7 @@ const serviceAdapter = new ExperimentalEmptyAdapter();
 const runtime = new CopilotRuntime({
   agents: {
     //@ts-ignore
-    my_agent: new HttpAgent({ url: 'http://localhost:8000/copilotkit' }),
+    recipe_agent: new HttpAgent({ url: 'http://localhost:8000/copilotkit' }),
   },
 });
 
