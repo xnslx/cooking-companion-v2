@@ -1,5 +1,6 @@
 'use client';
 
+import { motion, AnimatePresence } from 'framer-motion';
 import { Recipe } from '../types';
 
 const DIFFICULTY_STYLES = {
@@ -37,9 +38,19 @@ export function RecipeHeaderCard({ recipe }: { recipe: Recipe }) {
       )}
 
       <div className="flex flex-wrap gap-4">
-        <div className="text-sm text-gray-600">
-          <span className="font-medium">Servings:</span>{' '}
-          {recipe.servings}
+        <div className="text-sm text-gray-600 flex items-center gap-1">
+          <span className="font-medium">Servings:</span>
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={recipe.servings}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.2 }}
+            >
+              {recipe.servings}
+            </motion.span>
+          </AnimatePresence>
           {recipe.original_servings && recipe.original_servings !== recipe.servings && (
             <span className="ml-1 text-gray-400">(originally {recipe.original_servings})</span>
           )}
