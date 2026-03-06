@@ -3,6 +3,14 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* CopilotKit theme */
+  --copilot-kit-primary-color: #3b82f6;
+  --copilot-kit-secondary-color: #f8fafc;
+  --copilot-kit-separator-color: #e2e8f0;
+  --copilot-kit-font-family: var(--font-geist-sans);
+  --copilot-kit-response-button-color: #3b82f6;
+  --copilot-kit-response-button-background-color: #eff6ff;
 }
 
 @theme inline {

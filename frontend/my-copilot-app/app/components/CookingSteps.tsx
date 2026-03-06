@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { RecipeStep } from '../types';
 
 export function CookingSteps({
@@ -18,13 +19,19 @@ export function CookingSteps({
           const isActive = step.step_number - 1 === currentStep;
 
           return (
-            <li
+            <motion.li
               key={step.step_number}
+              layout
+              animate={{
+                opacity: isDone ? 0.5 : 1,
+                scale: isActive ? 1.01 : 1,
+              }}
+              transition={{ duration: 0.25 }}
               className={`flex gap-4 rounded-xl p-4 transition-colors ${
                 isActive
                   ? 'bg-blue-50 border border-blue-200'
                   : isDone
-                  ? 'opacity-50'
+                  ? ''
                   : 'bg-gray-50'
               }`}
             >
@@ -70,7 +77,7 @@ export function CookingSteps({
                   </ul>
                 )}
               </div>
-            </li>
+            </motion.li>
           );
         })}
       </ol>
