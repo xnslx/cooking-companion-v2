@@ -2,8 +2,9 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 
-const INGREDIENTS = [
+const ALL_INGREDIENTS = [
   { emoji: '🍅', left: '3%',  delay: 0.5,  rotation: -25, stiffness: 70,  damping: 9  },
   { emoji: '🧄', left: '13%', delay: 0.1,  rotation: 18,  stiffness: 90,  damping: 11 },
   { emoji: '🥕', left: '22%', delay: 0.75, rotation: -12, stiffness: 60,  damping: 8  },
@@ -18,11 +19,17 @@ const INGREDIENTS = [
 
 export function PageLoadAnimation({ onComplete }: { onComplete: () => void }) {
   const [show, setShow] = useState(true);
+  const breakpoint = useBreakpoint();
+  const isMobile = breakpoint === 'mobile';
+
+  const ingredients = isMobile ? ALL_INGREDIENTS.slice(0, 6) : ALL_INGREDIENTS;
+  const fontSize = isMobile ? '8rem' : '16rem';
+  const landY = isMobile ? 'calc(100vh - 130px)' : 'calc(100vh - 260px)';
+  const startY = isMobile ? 'calc(-8rem - 40px)' : 'calc(-16rem - 40px)';
 
   useEffect(() => {
-    // let last ingredient land + settle, then fade the overlay out
     const hideTimer = setTimeout(() => setShow(false), 3200);
-    const doneTimer = setTimeout(onComplete, 3700); // after fade-out
+    const doneTimer = setTimeout(onComplete, 3700);
     return () => {
       clearTimeout(hideTimer);
       clearTimeout(doneTimer);
@@ -37,13 +44,13 @@ export function PageLoadAnimation({ onComplete }: { onComplete: () => void }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5, ease: 'easeInOut' }}
         >
-          {INGREDIENTS.map((ing) => (
+          {ingredients.map((ing) => (
             <motion.div
               key={ing.emoji}
               className="absolute select-none"
-              style={{ left: ing.left, fontSize: '16rem', lineHeight: 1 }}
-              initial={{ y: 'calc(-16rem - 40px)', rotate: ing.rotation, opacity: 1 }}
-              animate={{ y: 'calc(100vh - 260px)', rotate: 0 }}
+              style={{ left: ing.left, fontSize, lineHeight: 1 }}
+              initial={{ y: startY, rotate: ing.rotation, opacity: 1 }}
+              animate={{ y: landY, rotate: 0 }}
               transition={{
                 delay: ing.delay,
                 type: 'spring',

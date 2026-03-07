@@ -13,6 +13,7 @@ import { CookingProgressBar } from './components/CookingProgressBar';
 import { PageLoadAnimation } from './components/PageLoadAnimation';
 import { WokLoadingAnimation } from './components/WokLoadingAnimation';
 import { CustomChatInput } from './components/CustomChatInput';
+import { useBreakpoint } from './hooks/useBreakpoint';
 import { RecipeContext } from './types';
 
 const C = {
@@ -92,6 +93,10 @@ export default function Home() {
   const { state, setState, running } = useCoAgent<RecipeContext>({
     name: 'recipe_agent',
   });
+  const breakpoint = useBreakpoint();
+  const isMobile = breakpoint === 'mobile';
+  const isTablet = breakpoint === 'tablet';
+  const [activeTab, setActiveTab] = useState<'recipe' | 'chat'>('recipe');
   const [introComplete, setIntroComplete] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -218,7 +223,7 @@ export default function Home() {
             flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
-            padding: '0 28px',
+            padding: isMobile ? '0 16px' : '0 28px',
             borderBottom: `1px solid ${C.border}`,
             background: C.warmWhite,
           }}
@@ -241,7 +246,7 @@ export default function Home() {
               style={{
                 fontFamily: "'Lora', serif",
                 fontWeight: 600,
-                fontSize: 15,
+                fontSize: isMobile ? 14 : 15,
                 color: C.charcoal,
               }}
             >
@@ -251,10 +256,16 @@ export default function Home() {
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden' }}>
           {/* Left panel */}
           <div
-            style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 40px' }}
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: isMobile ? '16px 16px 24px' : '28px 28px 40px',
+              display: isMobile && activeTab !== 'recipe' ? 'none' : 'block',
+              WebkitOverflowScrolling: 'touch',
+            }}
           >
             <AnimatePresence mode="wait">
               {/* Loading view */}
@@ -354,7 +365,7 @@ export default function Home() {
                         : uploadedFile
                         ? C.sageLight
                         : C.cream,
-                      padding: '52px 24px',
+                      padding: isMobile ? '32px 16px' : '52px 24px',
                       cursor: uploadedFile ? 'default' : 'pointer',
                       transition: 'all 0.22s',
                       marginBottom: 28,
@@ -434,7 +445,7 @@ export default function Home() {
                           >
                             <p
                               style={{
-                                fontSize: 24,
+                                fontSize: isMobile ? 18 : 24,
                                 fontWeight: 600,
                                 color: C.charcoal,
                                 marginBottom: 2,
@@ -572,8 +583,9 @@ export default function Home() {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns:
-                        'repeat(auto-fill, minmax(400px, 1fr))',
+                      gridTemplateColumns: isMobile
+                        ? '1fr'
+                        : 'repeat(auto-fill, minmax(400px, 1fr))',
                       gap: 12,
                     }}
                   >
@@ -599,7 +611,7 @@ export default function Home() {
                               isActive ? recipe.accentBorder : C.border
                             }`,
                             borderRadius: 14,
-                            padding: '60px 20px 60px',
+                            padding: isMobile ? '24px 16px' : '60px 20px 60px',
                             cursor: 'pointer',
                             transition: 'all 0.2s',
                             position: 'relative',
@@ -637,7 +649,7 @@ export default function Home() {
                           </motion.div>
                           <p
                             style={{
-                              fontSize: 24,
+                              fontSize: isMobile ? 18 : 24,
                               fontWeight: 700,
                               color: C.charcoal,
                               marginBottom: 6,
@@ -649,7 +661,7 @@ export default function Home() {
                           </p>
                           <p
                             style={{
-                              fontSize: 16,
+                              fontSize: isMobile ? 13 : 16,
                               color: C.muted,
                               lineHeight: 1.55,
                               marginBottom: 10,
@@ -729,13 +741,15 @@ export default function Home() {
           {/* Right: Chat panel */}
           <div
             style={{
-              width: 520,
+              width: isMobile ? '100%' : isTablet ? 360 : 520,
               flexShrink: 0,
-              borderLeft: `1px solid ${C.border}`,
-              display: 'flex',
+              borderLeft: isMobile ? 'none' : `1px solid ${C.border}`,
+              borderTop: isMobile ? `1px solid ${C.border}` : 'none',
+              display: isMobile && activeTab !== 'chat' ? 'none' : 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              height: '100%',
+              flex: isMobile ? 1 : undefined,
+              height: isMobile ? undefined : '100%',
             }}
           >
             {/* Chat header */}
@@ -789,6 +803,53 @@ export default function Home() {
               <CopilotChat className="h-full" Input={CustomChatInput as React.ComponentType<object>} />
             </div>
           </div>
+
+          {/* Mobile tab bar */}
+          {isMobile && (
+            <div
+              style={{
+                height: 56,
+                flexShrink: 0,
+                display: 'flex',
+                borderTop: `1px solid ${C.border}`,
+                background: C.warmWhite,
+              }}
+            >
+              {(['recipe', 'chat'] as const).map((tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: 11,
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? C.lavenderDark : C.muted,
+                      borderTop: isActive ? `2px solid ${C.lavenderDark}` : '2px solid transparent',
+                      paddingTop: 6,
+                    }}
+                  >
+                    {tab === 'recipe' ? <ChefHat size={18} /> : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                    )}
+                    {tab === 'recipe' ? 'Recipe' : 'Chat'}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </>
