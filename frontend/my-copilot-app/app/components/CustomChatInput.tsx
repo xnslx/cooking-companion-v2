@@ -55,8 +55,9 @@ export function CustomChatInput({
   };
 
   const handleTranscript = (transcript: string) => {
-    setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-    textareaRef.current?.focus();
+    const trimmed = transcript.trim();
+    if (!trimmed) return;
+    onSend(trimmed);
   };
 
   const canSend = text.trim().length > 0 && !inProgress;
