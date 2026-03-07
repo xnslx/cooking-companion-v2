@@ -271,7 +271,9 @@ export default function Home() {
                     height: '60vh',
                   }}
                 >
-                  <WokLoadingAnimation label={loadingLabel} />
+                  <div style={{ transform: 'scale(3)', transformOrigin: 'center center' }}>
+                    <WokLoadingAnimation label={loadingLabel} />
+                  </div>
                 </motion.div>
               ) : /* Recipe view */
               state?.recipe ? (
