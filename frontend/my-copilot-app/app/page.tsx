@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useCoAgent } from '@copilotkit/react-core';
 import { CopilotChat } from '@copilotkit/react-ui';
 import '@copilotkit/react-ui/styles.css';
@@ -11,6 +11,7 @@ import { IngredientsList } from './components/IngredientsList';
 import { CookingSteps } from './components/CookingSteps';
 import { CookingProgressBar } from './components/CookingProgressBar';
 import { PageLoadAnimation } from './components/PageLoadAnimation';
+import { WokLoadingAnimation } from './components/WokLoadingAnimation';
 import { RecipeContext } from './types';
 
 const C = {
@@ -96,7 +97,25 @@ export default function Home() {
   const [activeRecipe, setActiveRecipe] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingLabel, setLoadingLabel] = useState('Parsing your recipe...');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const LOADING_LABELS = [
+    'Parsing your recipe...',
+    'Identifying ingredients...',
+    'Building cooking steps...',
+    'Almost ready...',
+  ];
+
+  useEffect(() => {
+    if (!loading) return;
+    let i = 0;
+    const interval = setInterval(() => {
+      i = (i + 1) % LOADING_LABELS.length;
+      setLoadingLabel(LOADING_LABELS[i]);
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   async function submitFile(file: File) {
     setError(null);
@@ -237,8 +256,25 @@ export default function Home() {
             style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 40px' }}
           >
             <AnimatePresence mode="wait">
-              {/* Recipe view */}
-              {state?.recipe ? (
+              {/* Loading view */}
+              {loading ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '60vh',
+                  }}
+                >
+                  <WokLoadingAnimation label={loadingLabel} />
+                </motion.div>
+              ) : /* Recipe view */
+              state?.recipe ? (
                 <motion.div
                   key="recipe"
                   initial={{ opacity: 0 }}
