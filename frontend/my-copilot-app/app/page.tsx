@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useCoAgent } from '@copilotkit/react-core';
 import { CopilotChat } from '@copilotkit/react-ui';
 import '@copilotkit/react-ui/styles.css';
@@ -12,6 +12,7 @@ import { CookingSteps } from './components/CookingSteps';
 import { CookingProgressBar } from './components/CookingProgressBar';
 import { PageLoadAnimation } from './components/PageLoadAnimation';
 import { WokLoadingAnimation } from './components/WokLoadingAnimation';
+import { CustomChatInput } from './components/CustomChatInput';
 import { RecipeContext } from './types';
 
 const C = {
@@ -785,7 +786,7 @@ export default function Home() {
                 flexDirection: 'column',
               }}
             >
-              <CopilotChat className="h-full" />
+              <CopilotChat className="h-full" Input={CustomChatInput as React.ComponentType<object>} />
             </div>
           </div>
         </div>
