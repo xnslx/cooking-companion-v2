@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowUp, Square } from 'lucide-react';
+import { InputProps } from '@copilotkit/react-ui';
 import { VoiceChatInput } from './VoiceChatInput';
 
 const C = {
@@ -13,15 +14,6 @@ const C = {
   muted: '#8a8680',
   border: '#e4dfd8',
 };
-
-interface InputProps {
-  inProgress: boolean;
-  onSend: (text: string) => Promise<unknown>;
-  isVisible?: boolean;
-  onStop?: () => void;
-  hideStopButton?: boolean;
-  chatReady?: boolean;
-}
 
 export function CustomChatInput({
   inProgress,

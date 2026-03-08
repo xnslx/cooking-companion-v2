@@ -13,7 +13,9 @@ import { CookingProgressBar } from './components/CookingProgressBar';
 import { PageLoadAnimation } from './components/PageLoadAnimation';
 import { WokLoadingAnimation } from './components/WokLoadingAnimation';
 import { CustomChatInput } from './components/CustomChatInput';
+import { NetworkToast } from './components/ErrorToast';
 import { useBreakpoint } from './hooks/useBreakpoint';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { RecipeContext } from './types';
 
 const C = {
@@ -103,7 +105,11 @@ export default function Home() {
   const [activeRecipe, setActiveRecipe] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
   const [loadingLabel, setLoadingLabel] = useState('Parsing your recipe...');
+  const [backOnlineVisible, setBackOnlineVisible] = useState(false);
+  const { isOnline } = useNetworkStatus();
+  const prevOnlineRef = useRef(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const LOADING_LABELS = [
@@ -123,6 +129,41 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [loading]);
 
+  useEffect(() => {
+    if (!prevOnlineRef.current && isOnline) {
+      setBackOnlineVisible(true);
+      const t = setTimeout(() => setBackOnlineVisible(false), 3000);
+      return () => clearTimeout(t);
+    }
+    prevOnlineRef.current = isOnline;
+  }, [isOnline]);
+
+  function getUploadError(e: unknown): string {
+    if (!isOnline) return 'No connection — check your network and try again';
+    if (e instanceof TypeError)
+      return 'No connection — check your network and try again';
+    if (e instanceof Error) {
+      if (
+        e.message.includes('500') ||
+        e.message.includes('502') ||
+        e.message.includes('503')
+      )
+        return 'Server error — the backend may be down';
+      if (e.message.includes('4'))
+        return 'Upload failed — check the file and try again';
+      return e.message;
+    }
+    return 'Something went wrong. Please try again.';
+  }
+
+  function validateFile(file: File): string | null {
+    if (file.size > 10 * 1024 * 1024) return 'File is too large (max 10 MB)';
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'pdf' && ext !== 'txt')
+      return 'Only PDF and TXT files are supported';
+    return null;
+  }
+
   async function submitFile(file: File) {
     setError(null);
     setLoading(true);
@@ -136,10 +177,10 @@ export default function Home() {
       if (!res.ok) throw new Error(`Upload failed (${res.status})`);
       const data = await res.json();
       if (!data.state?.recipe)
-        throw new Error('Could not parse recipe. Try another file.');
+        throw new Error('Could not parse a recipe from this file');
       setState(data.state);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(getUploadError(e));
     } finally {
       setLoading(false);
     }
@@ -166,7 +207,7 @@ export default function Home() {
       if (!data.state?.recipe) throw new Error('Could not parse recipe.');
       setState(data.state);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(getUploadError(e));
     } finally {
       setLoading(false);
     }
@@ -177,6 +218,12 @@ export default function Home() {
     setDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) {
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+      setError(null);
       setUploadedFile(file);
       setActiveRecipe(null);
     }
@@ -185,6 +232,12 @@ export default function Home() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+      setError(null);
       setUploadedFile(file);
       setActiveRecipe(null);
     }
@@ -202,6 +255,12 @@ export default function Home() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 99px; }
       `}</style>
+
+      <NetworkToast
+        isOnline={isOnline}
+        backOnlineVisible={backOnlineVisible}
+        onDismissBackOnline={() => setBackOnlineVisible(false)}
+      />
 
       {!introComplete && (
         <PageLoadAnimation onComplete={() => setIntroComplete(true)} />
@@ -256,7 +315,14 @@ export default function Home() {
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden' }}>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            overflow: 'hidden',
+          }}
+        >
           {/* Left panel */}
           <div
             style={{
@@ -283,7 +349,12 @@ export default function Home() {
                     height: '60vh',
                   }}
                 >
-                  <div style={{ transform: 'scale(3)', transformOrigin: 'center center' }}>
+                  <div
+                    style={{
+                      transform: 'scale(3)',
+                      transformOrigin: 'center center',
+                    }}
+                  >
                     <WokLoadingAnimation label={loadingLabel} />
                   </div>
                 </motion.div>
@@ -789,6 +860,45 @@ export default function Home() {
                   ? 'Recipe selected — click "Load in chat" to start.'
                   : 'Upload a recipe or click an example to get started.'}
               </p>
+
+              <AnimatePresence>
+                {agentError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.2 }}
+                    style={{
+                      marginTop: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      background: '#fef3c7',
+                      border: '1px solid #fcd34d',
+                      borderRadius: 8,
+                      padding: '7px 10px',
+                      fontSize: 12,
+                      color: '#92400e',
+                    }}
+                  >
+                    <span>{agentError}</span>
+                    <button
+                      onClick={() => setAgentError(null)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#92400e',
+                        padding: 0,
+                        lineHeight: 1,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* CopilotChat fills the rest */}
@@ -800,7 +910,18 @@ export default function Home() {
                 flexDirection: 'column',
               }}
             >
-              <CopilotChat className="h-full" Input={CustomChatInput as React.ComponentType<object>} />
+              <CopilotChat
+                className="h-full"
+                Input={CustomChatInput}
+                onInProgress={(inProgress) => {
+                  if (!inProgress && running) {
+                    setAgentError(
+                      'The assistant ran into an issue. Try sending your message again.'
+                    );
+                    setTimeout(() => setAgentError(null), 8000);
+                  }
+                }}
+              />
             </div>
           </div>
 
@@ -835,12 +956,25 @@ export default function Home() {
                       fontSize: 11,
                       fontWeight: isActive ? 700 : 500,
                       color: isActive ? C.lavenderDark : C.muted,
-                      borderTop: isActive ? `2px solid ${C.lavenderDark}` : '2px solid transparent',
+                      borderTop: isActive
+                        ? `2px solid ${C.lavenderDark}`
+                        : '2px solid transparent',
                       paddingTop: 6,
                     }}
                   >
-                    {tab === 'recipe' ? <ChefHat size={18} /> : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {tab === 'recipe' ? (
+                      <ChefHat size={18} />
+                    ) : (
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                       </svg>
                     )}

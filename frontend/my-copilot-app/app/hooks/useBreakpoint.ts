@@ -11,11 +11,10 @@ function getBreakpoint(width: number): Breakpoint {
 }
 
 export function useBreakpoint(): Breakpoint {
-  const [breakpoint, setBreakpoint] = useState<Breakpoint>(() =>
-    typeof window !== 'undefined' ? getBreakpoint(window.innerWidth) : 'desktop'
-  );
+  const [breakpoint, setBreakpoint] = useState<Breakpoint>('desktop');
 
   useEffect(() => {
+    setBreakpoint(getBreakpoint(window.innerWidth));
     const handler = () => setBreakpoint(getBreakpoint(window.innerWidth));
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
