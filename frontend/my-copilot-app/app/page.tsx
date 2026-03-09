@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useCoAgent } from '@copilotkit/react-core';
+import { CopilotKit, useCoAgent } from '@copilotkit/react-core';
 import { CopilotChat } from '@copilotkit/react-ui';
 import '@copilotkit/react-ui/styles.css';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -92,9 +92,34 @@ const exampleRecipes = [
 ];
 
 export default function Home() {
-  const { state, setState, running } = useCoAgent<RecipeContext>({
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  return (
+    <CopilotKit runtimeUrl="/api/copilotkit" agent="recipe_agent" threadId={threadId}>
+      <HomeContent setThreadId={setThreadId} />
+    </CopilotKit>
+  );
+}
+
+function HomeContent({ setThreadId }: { setThreadId: (id: string) => void }) {
+  const { state: agentState, setState, running } = useCoAgent<RecipeContext>({
     name: 'recipe_agent',
   });
+  const [uploadedState, setUploadedState] = useState<RecipeContext | null>(null);
+  const [pendingAgentState, setPendingAgentState] = useState<RecipeContext | null>(null);
+
+  // Agent state takes priority once it has a recipe (agent-driven updates).
+  // Fall back to uploadedState for the initial display after upload.
+  const state = (agentState?.recipe != null ? agentState : uploadedState) ?? agentState;
+
+  // After setThreadId fires, CopilotKit re-initializes the session.
+  // We wait until that re-render completes, then push the recipe into the new session.
+  useEffect(() => {
+    if (pendingAgentState) {
+      setState(pendingAgentState);
+      setPendingAgentState(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentState]);
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === 'mobile';
   const isTablet = breakpoint === 'tablet';
@@ -177,8 +202,11 @@ export default function Home() {
       if (!res.ok) throw new Error(`Upload failed (${res.status})`);
       const data = await res.json();
       if (!data.state?.recipe)
-        throw new Error('Could not parse a recipe from this file');
-      setState(data.state);
+        throw new Error(data.error || 'Could not parse a recipe from this file');
+      setUploadedState(data.state);
+      setPendingAgentState(data.state);
+      setThreadId(data.threadId);
+      setAgentError(null);
     } catch (e: unknown) {
       setError(getUploadError(e));
     } finally {
@@ -204,8 +232,11 @@ export default function Home() {
       });
       if (!res.ok) throw new Error(`Upload failed (${res.status})`);
       const data = await res.json();
-      if (!data.state?.recipe) throw new Error('Could not parse recipe.');
-      setState(data.state);
+      if (!data.state?.recipe) throw new Error(data.error || 'Could not parse recipe.');
+      setUploadedState(data.state);
+      setPendingAgentState(data.state);
+      setThreadId(data.threadId);
+      setAgentError(null);
     } catch (e: unknown) {
       setError(getUploadError(e));
     } finally {
@@ -385,6 +416,11 @@ export default function Home() {
                       key="steps"
                       steps={state.recipe.steps}
                       currentStep={state.current_step}
+                      onStepToggle={(newStep) => {
+                        const updated = { ...state, current_step: newStep };
+                        setUploadedState(updated as RecipeContext);
+                        setState(updated as RecipeContext);
+                      }}
                     />,
                   ].map((panel, i) => (
                     <motion.div

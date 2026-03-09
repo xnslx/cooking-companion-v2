@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowUp, Square } from 'lucide-react';
 import { InputProps } from '@copilotkit/react-ui';
@@ -23,6 +23,9 @@ export function CustomChatInput({
 }: InputProps) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Stable ref so handleTranscript never becomes a new function reference
+  const onSendRef = useRef(onSend);
+  onSendRef.current = onSend;
 
   // Auto-resize textarea
   useEffect(() => {
@@ -46,11 +49,13 @@ export function CustomChatInput({
     }
   };
 
-  const handleTranscript = (transcript: string) => {
+  // useCallback with [] so VoiceChatInput never sees a changed onTranscript prop
+  const handleTranscript = useCallback((transcript: string) => {
     const trimmed = transcript.trim();
     if (!trimmed) return;
-    onSend(trimmed);
-  };
+    onSendRef.current(trimmed);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canSend = text.trim().length > 0 && !inProgress;
 

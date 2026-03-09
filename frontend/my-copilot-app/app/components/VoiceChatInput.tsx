@@ -67,6 +67,9 @@ export function VoiceChatInput({ onTranscript }: { onTranscript: (text: string) 
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep ref always up-to-date so stopRecording never captures a stale closure
+  const onTranscriptRef = useRef(onTranscript);
+  onTranscriptRef.current = onTranscript;
 
   const stopRecording = useCallback(async (cancelled = false) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -101,7 +104,7 @@ export function VoiceChatInput({ onTranscript }: { onTranscript: (text: string) 
           const res = await fetch('/api/transcribe', { method: 'POST', body: form });
           const data = await res.json();
           if (data.text) {
-            onTranscript(data.text);
+            onTranscriptRef.current(data.text);
             setState('idle');
           } else {
             setState('error');
@@ -115,7 +118,8 @@ export function VoiceChatInput({ onTranscript }: { onTranscript: (text: string) 
       };
       recorder.stop();
     });
-  }, [onTranscript]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startRecording = useCallback(async () => {
     setState('idle');

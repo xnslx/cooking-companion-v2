@@ -58,15 +58,25 @@ async def upload_document(file: UploadFile = File(...)) -> dict[str, Any]:
     # Extract text based on file type
     if filename.endswith(".pdf"):
         reader = PdfReader(BytesIO(content))
-        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        pages_text = [page.extract_text() or "" for page in reader.pages]
+        text = "\n".join(pages_text)
+        logger.info(f"PDF extraction: {len(reader.pages)} pages, {len(text)} chars")
+        if len(text.strip()) < 50:
+            logger.warning("PDF text extraction returned very little text — likely a scanned/image PDF")
+            return {
+                "threadId": str(uuid.uuid4()),
+                "runId": str(uuid.uuid4()),
+                "state": RecipeContext(document_text="", recipe=None),
+                "error": "Could not extract text from this PDF. It may be a scanned image. Try a text-based PDF or paste the recipe as a .txt file.",
+                "tools": [], "context": [], "forwardedProps": {}, "messages": [],
+            }
     else:
         text = content.decode("utf-8", errors="ignore")
 
+    logger.info(f"Parsing recipe from {len(text)} chars of text")
+
     # Parse recipe using pydantic-ai
     recipe = await parse_recipe_from_text(text)
-    # # Include parsed recipe if available
-    # if not recipe:
-    #     raise Exception()
 
     # Build response - frontend stores this in state
     response: dict[str, Any] = {
