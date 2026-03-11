@@ -80,7 +80,7 @@ async def parse_recipe_from_text(document_text: str) -> Recipe | None:
         recipe.source_text = document_text
         return recipe
     except Exception as e:
-        logger.warning(f"Recipe parsing failed: {e}")
+        logger.warning(f"Recipe parsing failed: {e}", exc_info=True)
         return None
 
 

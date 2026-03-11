@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useCoAgent } from '@copilotkit/react-core';
+import { CopilotKit, useCoAgent } from '@copilotkit/react-core';
 import { CopilotChat } from '@copilotkit/react-ui';
 import '@copilotkit/react-ui/styles.css';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Upload, FileText, ChefHat, Sparkles, ArrowRight } from 'lucide-react';
+import { Upload, FileText, ChefHat, Sparkles, ArrowRight, Bookmark, BookmarkCheck, X } from 'lucide-react';
 import { RecipeHeaderCard } from './components/RecipeHeaderCard';
 import { IngredientsList } from './components/IngredientsList';
 import { CookingSteps } from './components/CookingSteps';
@@ -17,6 +17,44 @@ import { NetworkToast } from './components/ErrorToast';
 import { useBreakpoint } from './hooks/useBreakpoint';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { RecipeContext } from './types';
+
+const STORAGE_KEY = 'dishcraft_saved_recipes';
+
+interface SavedRecipe {
+  id: string;
+  savedAt: string;
+  title: string;
+  cuisine: string | null;
+  servings: number;
+  emoji: string;
+  state: RecipeContext;
+}
+
+function cuisineEmoji(cuisine: string | null): string {
+  const map: Record<string, string> = {
+    italian: '🍝', thai: '🍛', japanese: '🍜', french: '🥗',
+    'middle eastern': '🫓', american: '🍔', mexican: '🌮',
+    indian: '🍲', chinese: '🥢', greek: '🫒', spanish: '🥘',
+  };
+  return cuisine ? (map[cuisine.toLowerCase()] ?? '📖') : '📖';
+}
+
+function loadFromStorage(): SavedRecipe[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToStorage(recipes: SavedRecipe[]) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
+  } catch {
+    // sessionStorage full or unavailable — silently ignore
+  }
+}
 
 const C = {
   lavenderDark: '#9b87f5',
@@ -53,48 +91,43 @@ const exampleRecipes = [
     accent: C.sageLight,
     accentBorder: C.sage,
   },
-  {
-    id: 3,
-    emoji: '🍞',
-    title: 'Banana Bread',
-    tags: ['Baking', '1 hr 10 mins', '8 slices'],
-    desc: 'Moist, one-bowl banana bread with a hint of cinnamon and vanilla.',
-    accent: C.lavenderLight,
-    accentBorder: C.lavender,
-  },
-  {
-    id: 4,
-    emoji: '🍜',
-    title: 'Homemade Ramen',
-    tags: ['Japanese', '50 mins', '2 servings'],
-    desc: 'Silky broth, soft-boiled eggs, chashu pork, and chewy noodles.',
-    accent: C.peachLight,
-    accentBorder: C.peach,
-  },
-  {
-    id: 5,
-    emoji: '🥗',
-    title: 'Niçoise Salad',
-    tags: ['French', '20 mins', '2 servings'],
-    desc: 'Tuna, olives, green beans, and a sharp Dijon vinaigrette.',
-    accent: C.sageLight,
-    accentBorder: C.sage,
-  },
-  {
-    id: 6,
-    emoji: '🫓',
-    title: 'Shakshuka',
-    tags: ['Middle Eastern', '25 mins', '2 servings'],
-    desc: 'Eggs poached in spiced tomato and pepper sauce, served with crusty bread.',
-    accent: C.lavenderLight,
-    accentBorder: C.lavender,
-  },
+];
+
+const CARD_ACCENTS = [
+  { accent: C.lavenderLight, accentBorder: C.lavender },
+  { accent: C.peachLight,    accentBorder: C.peach    },
+  { accent: C.sageLight,     accentBorder: C.sage     },
 ];
 
 export default function Home() {
-  const { state, setState, running } = useCoAgent<RecipeContext>({
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  return (
+    <CopilotKit runtimeUrl="/api/copilotkit" agent="recipe_agent" threadId={threadId}>
+      <HomeContent setThreadId={setThreadId} />
+    </CopilotKit>
+  );
+}
+
+function HomeContent({ setThreadId }: { setThreadId: (id: string) => void }) {
+  const { state: agentState, setState, running } = useCoAgent<RecipeContext>({
     name: 'recipe_agent',
   });
+  const [uploadedState, setUploadedState] = useState<RecipeContext | null>(null);
+  const [pendingAgentState, setPendingAgentState] = useState<RecipeContext | null>(null);
+
+  // Agent state takes priority once it has a recipe (agent-driven updates).
+  // Fall back to uploadedState for the initial display after upload.
+  const state = (agentState?.recipe != null ? agentState : uploadedState) ?? agentState;
+
+  // After setThreadId fires, CopilotKit re-initializes the session.
+  // We wait until that re-render completes, then push the recipe into the new session.
+  useEffect(() => {
+    if (pendingAgentState) {
+      setState(pendingAgentState);
+      setPendingAgentState(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentState]);
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === 'mobile';
   const isTablet = breakpoint === 'tablet';
@@ -111,6 +144,47 @@ export default function Home() {
   const { isOnline } = useNetworkStatus();
   const prevOnlineRef = useRef(true);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  const [savedFeedback, setSavedFeedback] = useState(false);
+
+  // Load saved recipes from sessionStorage on mount
+  useEffect(() => {
+    setSavedRecipes(loadFromStorage());
+  }, []);
+
+  const currentRecipeId = state?.recipe ? state.recipe.title : null;
+  const isAlreadySaved = savedRecipes.some((r) => r.title === currentRecipeId);
+
+  function saveCurrentRecipe() {
+    if (!state?.recipe) return;
+    const recipe = state.recipe;
+    const entry: SavedRecipe = {
+      id: `${Date.now()}`,
+      savedAt: new Date().toISOString(),
+      title: recipe.title,
+      cuisine: recipe.cuisine,
+      servings: recipe.servings,
+      emoji: cuisineEmoji(recipe.cuisine),
+      state: state as RecipeContext,
+    };
+    const updated = [entry, ...savedRecipes.filter((r) => r.title !== recipe.title)];
+    setSavedRecipes(updated);
+    saveToStorage(updated);
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 2000);
+  }
+
+  function removeSavedRecipe(id: string) {
+    const updated = savedRecipes.filter((r) => r.id !== id);
+    setSavedRecipes(updated);
+    saveToStorage(updated);
+  }
+
+  function loadSavedRecipe(saved: SavedRecipe) {
+    setUploadedState(saved.state);
+    setPendingAgentState(saved.state);
+    setThreadId(crypto.randomUUID()); // new session → agentState resets → effect pushes recipe in
+  }
 
   const LOADING_LABELS = [
     'Parsing your recipe...',
@@ -177,8 +251,11 @@ export default function Home() {
       if (!res.ok) throw new Error(`Upload failed (${res.status})`);
       const data = await res.json();
       if (!data.state?.recipe)
-        throw new Error('Could not parse a recipe from this file');
-      setState(data.state);
+        throw new Error(data.error || 'Could not parse a recipe from this file');
+      setUploadedState(data.state);
+      setPendingAgentState(data.state);
+      setThreadId(data.threadId);
+      setAgentError(null);
     } catch (e: unknown) {
       setError(getUploadError(e));
     } finally {
@@ -204,8 +281,11 @@ export default function Home() {
       });
       if (!res.ok) throw new Error(`Upload failed (${res.status})`);
       const data = await res.json();
-      if (!data.state?.recipe) throw new Error('Could not parse recipe.');
-      setState(data.state);
+      if (!data.state?.recipe) throw new Error(data.error || 'Could not parse recipe.');
+      setUploadedState(data.state);
+      setPendingAgentState(data.state);
+      setThreadId(data.threadId);
+      setAgentError(null);
     } catch (e: unknown) {
       setError(getUploadError(e));
     } finally {
@@ -372,6 +452,38 @@ export default function Home() {
                     currentStep={state.current_step}
                     totalSteps={state.recipe.steps.length}
                   />
+
+                  {/* Save button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <motion.button
+                      onClick={saveCurrentRecipe}
+                      animate={savedFeedback ? { scale: [1, 1.15, 1] } : {}}
+                      transition={{ duration: 0.3 }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        border: `1.5px solid ${isAlreadySaved || savedFeedback ? C.sage : C.border}`,
+                        background: isAlreadySaved || savedFeedback ? C.sageLight : C.warmWhite,
+                        color: isAlreadySaved || savedFeedback ? '#3a7d44' : C.muted,
+                        borderRadius: 99,
+                        padding: '6px 14px',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: "'DM Sans', sans-serif",
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {isAlreadySaved || savedFeedback ? (
+                        <BookmarkCheck size={14} />
+                      ) : (
+                        <Bookmark size={14} />
+                      )}
+                      {savedFeedback ? 'Saved!' : isAlreadySaved ? 'Saved to library' : 'Save to my recipe library'}
+                    </motion.button>
+                  </div>
+
                   {[
                     <RecipeHeaderCard key="header" recipe={state.recipe} />,
                     <motion.div
@@ -385,6 +497,11 @@ export default function Home() {
                       key="steps"
                       steps={state.recipe.steps}
                       currentStep={state.current_step}
+                      onStepToggle={(newStep) => {
+                        const updated = { ...state, current_step: newStep };
+                        setUploadedState(updated as RecipeContext);
+                        setState(updated as RecipeContext);
+                      }}
                     />,
                   ].map((panel, i) => (
                     <motion.div
@@ -804,6 +921,158 @@ export default function Home() {
                       );
                     })}
                   </div>
+
+                  {/* Saved recipes section */}
+                  {savedRecipes.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      style={{ marginTop: 36 }}
+                    >
+                      <div style={{ marginBottom: 14 }}>
+                        <p style={{ fontSize: 16, fontWeight: 700, color: C.charcoal, marginBottom: 2 }}>
+                          Your saved recipes
+                        </p>
+                        <p style={{ fontSize: 12, color: C.muted }}>
+                          From previous uploads — click to load
+                        </p>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+                          gap: 12,
+                        }}
+                      >
+                        {savedRecipes.map((saved, i) => {
+                          const { accent, accentBorder } = CARD_ACCENTS[i % CARD_ACCENTS.length];
+                          return (
+                            <motion.div
+                              key={saved.id}
+                              layout
+                              initial={{ opacity: 0, y: 14 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              transition={{ duration: 0.35, delay: i * 0.06 }}
+                              whileHover={{ y: -2, boxShadow: '0 6px 20px rgba(0,0,0,0.08)' }}
+                              onClick={() => loadSavedRecipe(saved)}
+                              style={{
+                                background: C.warmWhite,
+                                border: `1.5px solid ${C.border}`,
+                                borderRadius: 14,
+                                padding: isMobile ? '24px 16px' : '60px 20px 60px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                position: 'relative',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {/* Remove button */}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); removeSavedRecipe(saved.id); }}
+                                title="Remove from library"
+                                style={{
+                                  position: 'absolute',
+                                  top: 10,
+                                  right: 10,
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: C.mutedLight,
+                                  padding: 4,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  borderRadius: '50%',
+                                }}
+                              >
+                                <X size={13} />
+                              </button>
+
+                              <motion.div
+                                style={{ fontSize: 28, marginBottom: 10, display: 'inline-block' }}
+                                whileHover={{ scale: 1.4, rotate: [0, -15, 15, -10, 10, 0] }}
+                                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                              >
+                                {saved.emoji}
+                              </motion.div>
+
+                              <p style={{
+                                fontSize: isMobile ? 18 : 24,
+                                fontWeight: 700,
+                                color: C.charcoal,
+                                marginBottom: 6,
+                                fontFamily: "'Lora', serif",
+                                lineHeight: 1.25,
+                              }}>
+                                {saved.title}
+                              </p>
+
+                              <p style={{
+                                fontSize: isMobile ? 13 : 16,
+                                color: C.muted,
+                                lineHeight: 1.55,
+                                marginBottom: 10,
+                              }}>
+                                {saved.state.recipe?.description ?? `${saved.cuisine ?? 'Recipe'} · ${saved.servings} servings`}
+                              </p>
+
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+                                {[
+                                  saved.cuisine,
+                                  `${saved.servings} servings`,
+                                  ...(saved.state.recipe?.dietary_tags ?? []),
+                                ].filter(Boolean).map((tag) => (
+                                  <span
+                                    key={tag}
+                                    style={{
+                                      fontSize: 12.5,
+                                      color: C.muted,
+                                      background: C.cream,
+                                      border: `1px solid ${C.border}`,
+                                      borderRadius: 99,
+                                      padding: '2px 8px',
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+
+                              <motion.div
+                                initial={{ opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                              >
+                                <motion.button
+                                  onClick={(e) => { e.stopPropagation(); loadSavedRecipe(saved); }}
+                                  whileTap={{ scale: 0.95 }}
+                                  style={{
+                                    background: accent,
+                                    color: C.charcoal,
+                                    border: `1.5px solid ${accentBorder}`,
+                                    borderRadius: 99,
+                                    padding: '6px 14px',
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    fontFamily: "'DM Sans', sans-serif",
+                                  }}
+                                >
+                                  Load in chat <ArrowRight size={11} />
+                                </motion.button>
+                              </motion.div>
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

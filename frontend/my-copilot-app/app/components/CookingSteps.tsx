@@ -6,17 +6,26 @@ import { RecipeStep } from '../types';
 export function CookingSteps({
   steps,
   currentStep,
+  onStepToggle,
 }: {
   steps: RecipeStep[];
   currentStep: number;
+  onStepToggle?: (newStep: number) => void;
 }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
       <h2 className="text-lg font-semibold text-gray-900">Steps</h2>
       <ol className="space-y-4">
         {steps.map((step) => {
-          const isDone = step.step_number - 1 < currentStep;
+          const isDone = step.step_number <= currentStep;
           const isActive = step.step_number - 1 === currentStep;
+
+          const handleToggle = () => {
+            if (!onStepToggle) return;
+            // Checking: mark this step done → currentStep = step_number
+            // Unchecking: revert to just before this step → currentStep = step_number - 1
+            onStepToggle(isDone ? step.step_number - 1 : step.step_number);
+          };
 
           return (
             <motion.li
@@ -35,6 +44,7 @@ export function CookingSteps({
                   : 'bg-gray-50'
               }`}
             >
+              {/* Step number badge */}
               <div
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                   isActive
@@ -76,6 +86,25 @@ export function CookingSteps({
                     ))}
                   </ul>
                 )}
+
+                <button
+                  onClick={handleToggle}
+                  className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all ${
+                    isDone
+                      ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100'
+                      : 'border-gray-300 bg-white text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50'
+                  }`}
+                >
+                  {isDone ? (
+                    <>
+                      <span>✓</span> Done — undo?
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-base leading-none">○</span> Mark as done
+                    </>
+                  )}
+                </button>
               </div>
             </motion.li>
           );
